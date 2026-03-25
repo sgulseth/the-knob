@@ -1,16 +1,6 @@
 #pragma once
 
-#include "lvgl.h"
+// Station logo images removed — jukebox uses text-based UI.
+// This file kept as a placeholder for future image assets.
 
-LV_IMAGE_DECLARE(nrj);
-LV_IMAGE_DECLARE(nrk_jazz);
-LV_IMAGE_DECLARE(nrk_mp3);
-LV_IMAGE_DECLARE(nrk_nyheter);
-LV_IMAGE_DECLARE(nrk_p1);
-LV_IMAGE_DECLARE(nrk_p2);
-LV_IMAGE_DECLARE(nrk_p3);
-LV_IMAGE_DECLARE(p4);
-LV_IMAGE_DECLARE(p5);
-LV_IMAGE_DECLARE(p9);
-LV_IMAGE_DECLARE(radio_norge);
-LV_IMAGE_DECLARE(radio_rock);
+#include "lvgl.h"

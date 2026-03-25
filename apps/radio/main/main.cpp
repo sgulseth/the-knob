@@ -12,6 +12,7 @@
 #include "ui/ui_voice.h"
 #include "voice_task.h"
 #include "voice_tools.h"
+#include "voice_session.h"
 
 #include "esp_event.h"
 #include "esp_log.h"
@@ -28,6 +29,13 @@
 
 static constexpr const char *TAG = "main";
 
+// ─── App-level Events (after Sonos events at 200) ──────────────────────────
+
+enum : int32_t {
+  APP_EVENT_PLAYLIST_PLAY_REQUESTED = 210,
+  APP_EVENT_MODE_CHANGED = 211,
+};
+
 ESP_EVENT_DEFINE_BASE(APP_EVENT);
 
 static int s_volume;
@@ -36,7 +44,7 @@ static esp_timer_handle_t s_timer_tick_handle;
 
 static void on_station_changed(void *, esp_event_base_t, int32_t, void *data) {
   auto index = *static_cast<int32_t *>(data);
-  if (index < 0 || index >= STATION_COUNT)
+  if (index < 0 || index >= RADIO_STATION_COUNT)
     return;
   s_station_index = index;
   settings_set_station_index(s_station_index);
@@ -195,13 +203,42 @@ static void on_wifi_disconnected(void *, esp_event_base_t, int32_t, void *) {
 }
 
 static void on_play_requested(void *, esp_event_base_t, int32_t, void *) {
-  ESP_LOGI(TAG, "Play requested — station: %s", STATIONS[s_station_index].name);
-  sonos_play_uri(STATIONS[s_station_index].url);
+  // Cap volume on source change to avoid blasting audio
+  if (s_volume > VOLUME_CAP_ON_SOURCE_CHANGE) {
+    ESP_LOGI(TAG, "Volume %d exceeds cap %d — clamping", s_volume,
+             VOLUME_CAP_ON_SOURCE_CHANGE);
+    s_volume = VOLUME_CAP_ON_SOURCE_CHANGE;
+    sonos_set_volume(s_volume);
+    ui_set_volume(s_volume);
+  }
+
+  ESP_LOGI(TAG, "Play requested — station: %s",
+           RADIO_STATIONS[s_station_index].name);
+  sonos_play_uri(RADIO_STATIONS[s_station_index].url);
 }
 
 static void on_stop_requested(void *, esp_event_base_t, int32_t, void *) {
   ESP_LOGI(TAG, "Stop requested");
   sonos_stop_playback();
+}
+
+// ─── Playlist Events ────────────────────────────────────────────────────────
+
+static void on_playlist_play_requested(void *, esp_event_base_t, int32_t,
+                                       void *data) {
+  auto *uri = static_cast<const char *>(data);
+  ESP_LOGI(TAG, "Playlist play requested — uri: %s", uri);
+
+  // Cap volume on source change to avoid blasting audio
+  if (s_volume > VOLUME_CAP_ON_SOURCE_CHANGE) {
+    ESP_LOGI(TAG, "Volume %d exceeds cap %d — clamping", s_volume,
+             VOLUME_CAP_ON_SOURCE_CHANGE);
+    s_volume = VOLUME_CAP_ON_SOURCE_CHANGE;
+    sonos_set_volume(s_volume);
+    ui_set_volume(s_volume);
+  }
+
+  sonos_play_uri(uri);
 }
 
 static void init_nvs() {
@@ -243,6 +280,8 @@ static void register_events() {
                              nullptr);
   esp_event_handler_register(APP_EVENT, APP_EVENT_VOICE_TRANSCRIPT,
                              on_voice_transcript, nullptr);
+  esp_event_handler_register(APP_EVENT, APP_EVENT_PLAYLIST_PLAY_REQUESTED,
+                             on_playlist_play_requested, nullptr);
 }
 
 static void start_timer_tick() {
@@ -254,7 +293,7 @@ static void start_timer_tick() {
 }
 
 extern "C" void app_main() {
-  ESP_LOGI(TAG, "Sonos Radio starting");
+  ESP_LOGI(TAG, "Sonos Jukebox starting");
 
   init_nvs();
   settings_init();
@@ -270,18 +309,19 @@ extern "C" void app_main() {
   sonos_init();
 
   // Register station URLs for URI matching
-  static const char *station_urls[STATION_COUNT];
-  for (int i = 0; i < STATION_COUNT; i++)
-    station_urls[i] = STATIONS[i].url;
-  sonos_set_stations(station_urls, STATION_COUNT);
+  static const char *station_urls[RADIO_STATION_COUNT];
+  for (int i = 0; i < RADIO_STATION_COUNT; i++)
+    station_urls[i] = RADIO_STATIONS[i].url;
+  sonos_set_stations(station_urls, RADIO_STATION_COUNT);
 
   timer_init();
   ui_timer_init();
   voice_tools_init();
   voice_task_init();
+  voice_session_set_instructions(VOICE_INSTRUCTIONS);
   start_timer_tick();
   wifi_manager_init();
 
   ESP_LOGI(TAG, "Init complete — station: %s, volume: %d",
-           STATIONS[s_station_index].name, s_volume);
+           RADIO_STATIONS[s_station_index].name, s_volume);
 }

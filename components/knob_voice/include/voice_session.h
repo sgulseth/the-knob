@@ -24,3 +24,11 @@ int voice_session_build_update(char *buf, size_t buf_len);
 
 // Recommended minimum buffer size for voice_session_build_update.
 constexpr size_t VOICE_SESSION_BUF_SIZE = 4096;
+
+// ─── Configurable Instructions ──────────────────────────────────────────────
+//
+// Override the default system instructions used in the session.update payload.
+// Pass a pointer to a string that remains valid for the lifetime of the session.
+// Pass nullptr to revert to the built-in default instructions.
+
+void voice_session_set_instructions(const char *instructions);

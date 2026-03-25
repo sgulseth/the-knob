@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstring>
 
-static constexpr const char *INSTRUCTIONS =
+static constexpr const char *DEFAULT_INSTRUCTIONS =
     "You are a helpful voice assistant built into a Sonos radio controller. "
     "Be concise — answers should be 1-3 sentences. Speak naturally and warmly. "
     "The user is controlling a Sonos speaker playing Norwegian radio stations. "
@@ -15,11 +15,19 @@ static constexpr const char *INSTRUCTIONS =
     "When the user asks about time remaining on a timer, use get_timer_status. "
     "Always confirm actions briefly after executing a tool.";
 
+static const char *s_instructions = nullptr;
+
+void voice_session_set_instructions(const char *instructions) {
+  s_instructions = instructions;
+}
+
 int voice_session_build_update(char *buf, size_t buf_len) {
   char tools[2048];
   int tools_len = voice_tools_build_json(tools, sizeof(tools));
   if (tools_len < 0)
     return -1;
+
+  const char *instructions = s_instructions ? s_instructions : DEFAULT_INSTRUCTIONS;
 
   int written =
       snprintf(buf, buf_len,
@@ -51,7 +59,7 @@ int voice_session_build_update(char *buf, size_t buf_len) {
                "\"max_output_tokens\":1024"
                "}"
                "}",
-               INSTRUCTIONS, OPENAI_VOICE, tools);
+               instructions, OPENAI_VOICE, tools);
 
   if (written < 0 || static_cast<size_t>(written) >= buf_len)
     return -1;

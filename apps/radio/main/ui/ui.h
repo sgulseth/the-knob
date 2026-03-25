@@ -15,10 +15,6 @@ void ui_set_speaker_name(const char *name);
 void ui_show_speaker_picker(const DiscoveryResult *speakers);
 void ui_show_scanning();
 
-void ui_on_encoder_rotate(int32_t steps);
-void ui_on_touch_tap();
-void ui_on_touch_long_press();
-
 void ui_voice_activate();
 void ui_voice_deactivate();
 void ui_voice_set_state(VoiceState state);
