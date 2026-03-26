@@ -111,6 +111,10 @@ static uint32_t s_local_vol_ms;
 // Browse timeout
 static lv_timer_t *s_browse_timer;
 
+// Browse mode indicator on NowPlaying (shows position when encoder browses while paused)
+static lv_timer_t *s_browse_indicator_timer;
+static constexpr int BROWSE_INDICATOR_MS = 2000;
+
 // Touch / press detection
 static lv_timer_t *s_press_timer;
 static bool s_press_was_long;
@@ -153,6 +157,7 @@ static void on_page_changed(int index, const char *id);
 static void on_encoder_poll(lv_timer_t *);
 static void on_prev_tap(lv_event_t *);
 static void on_next_tap(lv_event_t *);
+static void show_browse_indicator();
 static void highlight_picker_item(int highlight);
 
 // ─── User Filtering (skip users with no playlists) ────────────────────────
@@ -645,6 +650,34 @@ static void go_back() {
   }
 }
 
+static void on_browse_indicator_hide(lv_timer_t *) {
+  lv_timer_pause(s_browse_indicator_timer);
+  if (s_screen_state == AppScreen::NowPlaying) {
+    anim_fade(s_lbl_position, anim_opa_cb,
+              lv_obj_get_style_opa(s_lbl_position, LV_PART_MAIN),
+              LV_OPA_TRANSP, ANIM_FADE_MS, anim_hide_done);
+  }
+}
+
+static void show_browse_indicator() {
+  if (s_screen_state != AppScreen::NowPlaying)
+    return;
+  char pos_buf[24];
+  if (s_selected_mode == JukeboxMode::Radio) {
+    snprintf(pos_buf, sizeof(pos_buf), "%d / %d", s_radio_index + 1,
+             RADIO_STATION_COUNT);
+  } else {
+    int count = USERS[s_user_index].playlist_count;
+    snprintf(pos_buf, sizeof(pos_buf), "%d / %d", s_playlist_index + 1, count);
+  }
+  lv_label_set_text(s_lbl_position, pos_buf);
+  lv_obj_remove_flag(s_lbl_position, LV_OBJ_FLAG_HIDDEN);
+  lv_anim_delete(s_lbl_position, anim_opa_cb);
+  lv_obj_set_style_opa(s_lbl_position, LV_OPA_COVER, LV_PART_MAIN);
+  lv_timer_reset(s_browse_indicator_timer);
+  lv_timer_resume(s_browse_indicator_timer);
+}
+
 static void on_browse_timeout(lv_timer_t *) {
   lv_timer_pause(s_browse_timer);
   if (s_play_state == PlayState::Playing ||
@@ -958,6 +991,7 @@ static void handle_encoder(int32_t steps) {
       s_browsed_while_paused = true;
       haptic_buzz();
       update_screen_content();
+      show_browse_indicator();
     } else {
       // When playing, encoder = volume
       int raw = s_volume + static_cast<int>(steps) * VOLUME_STEP;
@@ -1328,6 +1362,10 @@ void ui_init() {
     s_browse_timer =
         lv_timer_create(on_browse_timeout, BROWSE_TIMEOUT_MS, nullptr);
     lv_timer_pause(s_browse_timer);
+
+    s_browse_indicator_timer =
+        lv_timer_create(on_browse_indicator_hide, BROWSE_INDICATOR_MS, nullptr);
+    lv_timer_pause(s_browse_indicator_timer);
 
     s_clock_timer = lv_timer_create(on_clock_tick, 30000, nullptr);
 
