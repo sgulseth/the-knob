@@ -386,8 +386,8 @@ static constexpr const char *SET_URI_META_FMT =
     "</u:SetAVTransportURI>";
 
 static void exec_play_uri(const char *uri) {
-  char fixed_uri[280];
-  char metadata[768] = "";
+  char fixed_uri[512];
+  char metadata[1024] = "";
   bool use_metadata = false;
 
   if (strncmp(uri, "spotify:playlist:", 17) == 0) {
@@ -415,7 +415,7 @@ static void exec_play_uri(const char *uri) {
   }
 
   // Build SOAP body — with or without metadata
-  static char inner[1536];
+  static char inner[2048];
   ESP_LOGI(TAG, "SetAVTransportURI: input='%s' → fixed='%s'", uri, fixed_uri);
   if (use_metadata) {
     snprintf(inner, sizeof(inner), SET_URI_META_FMT, fixed_uri, metadata);

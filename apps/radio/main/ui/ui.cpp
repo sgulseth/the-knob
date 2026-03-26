@@ -1383,7 +1383,7 @@ void ui_set_station(int index) {
 
 void ui_set_media_info(const MediaInfo *info) {
   // Download + decode album art OUTSIDE the display lock
-  bool art_ready = false;
+
   if (info && info->has_media && info->art_url[0] &&
       strcmp(info->art_url, s_art_last_url) != 0) {
     ESP_LOGI(TAG, "Art URL changed: %.120s", info->art_url);
@@ -1406,7 +1406,6 @@ void ui_set_media_info(const MediaInfo *info) {
           s_art_dsc.header.stride = static_cast<uint32_t>(aw * 2);
           s_art_dsc.data_size = static_cast<uint32_t>(aw * ah * 2);
           s_art_dsc.data = s_art_pixels;
-          art_ready = true;
         }
         strncpy(s_art_last_url, info->art_url, sizeof(s_art_last_url) - 1);
         s_art_last_url[sizeof(s_art_last_url) - 1] = '\0';
