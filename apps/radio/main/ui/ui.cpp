@@ -71,6 +71,8 @@ static bool s_idle_active = false;
 static MediaInfo s_media = {};
 static bool s_external_playing = false;
 static bool s_user_paused = false; // True when user tapped pause — suppresses auto-exit
+static uint32_t s_play_action_ms = 0; // Timestamp of last user play/pause action
+static constexpr int PLAY_STATE_GRACE_MS = 3000; // Ignore external state updates for 3s after user action
 static bool s_voice_active = false;
 
 // ─── Widgets ────────────────────────────────────────────────────────────────
@@ -715,11 +717,13 @@ static void do_tap() {
       sonos_pause();
       s_play_state = PlayState::Paused;
       s_user_paused = true;
+      s_play_action_ms = lv_tick_get();
     } else if (s_play_state == PlayState::Paused ||
                s_play_state == PlayState::Stopped) {
       sonos_play();
       s_play_state = PlayState::Playing;
       s_user_paused = false;
+      s_play_action_ms = lv_tick_get();
     }
     update_screen_content();
     break;
@@ -1359,6 +1363,12 @@ void ui_set_play_state(PlayState state) {
   if (state == s_play_state)
     return;
   if (display_lock(50)) {
+    // Ignore stale Sonos polls for a grace period after user action.
+    // The Sonos poll may report the old state before our command arrives.
+    if (lv_tick_elaps(s_play_action_ms) < PLAY_STATE_GRACE_MS) {
+      display_unlock();
+      return;
+    }
     s_play_state = state;
     if (s_screen_state == AppScreen::NowPlaying) {
       update_screen_content();
