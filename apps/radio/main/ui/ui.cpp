@@ -9,6 +9,7 @@
 #include "display.h"
 #include "ui_pages.h"
 #include "ui/ui_timer.h"
+#include "ui/ui_settings.h"
 #include "ui/ui_voice.h"
 
 #include "esp_heap_caps.h"
@@ -852,7 +853,11 @@ static void on_screen_released(lv_event_t *) {
   }
 
   if (!pages_is_home()) {
-    pages_go_home();
+    if (ui_settings_is_active()) {
+      ui_settings_tap();
+    } else {
+      pages_go_home();
+    }
     return;
   }
 
@@ -916,7 +921,11 @@ static void handle_encoder(int32_t steps) {
     return;
 
   if (!pages_is_home()) {
-    pages_navigate(steps > 0 ? 1 : -1);
+    if (ui_settings_is_active()) {
+      ui_settings_encoder(steps > 0 ? 1 : -1);
+    } else {
+      pages_navigate(steps > 0 ? 1 : -1);
+    }
     pages_poke();
     return;
   }
@@ -1385,6 +1394,7 @@ void ui_init() {
     lv_timer_create(on_encoder_poll, ENCODER_POLL_MS, nullptr);
 
     voice_ui_build(s_screen);
+    ui_settings_init();
 
     show_idle_ui(true);
 
