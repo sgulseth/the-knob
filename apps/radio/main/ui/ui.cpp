@@ -71,6 +71,7 @@ static bool s_idle_active = false;
 static MediaInfo s_media = {};
 static bool s_external_playing = false;
 static bool s_user_paused = false; // True when user tapped pause — suppresses auto-exit
+static bool s_browsed_while_paused = false; // True when encoder changed station/playlist while paused
 static uint32_t s_play_action_ms = 0; // Timestamp of last user play/pause action
 static constexpr int PLAY_STATE_GRACE_MS = 3000; // Ignore external state updates for 3s after user action
 static bool s_voice_active = false;
@@ -717,10 +718,30 @@ static void do_tap() {
       sonos_pause();
       s_play_state = PlayState::Paused;
       s_user_paused = true;
+      s_browsed_while_paused = false;
       s_play_action_ms = lv_tick_get();
     } else if (s_play_state == PlayState::Paused ||
                s_play_state == PlayState::Stopped) {
-      sonos_play();
+      if (s_browsed_while_paused) {
+        // User scrolled to a different station/playlist — start new content
+        s_browsed_while_paused = false;
+        s_external_playing = false;
+        s_media = {};
+        if (s_selected_mode == JukeboxMode::Radio) {
+          int32_t idx = s_radio_index;
+          esp_event_post(APP_EVENT, APP_EVENT_STATION_CHANGED, &idx,
+                         sizeof(idx), 0);
+          esp_event_post(APP_EVENT, APP_EVENT_PLAY_REQUESTED, nullptr, 0, 0);
+        } else {
+          auto &user = USERS[s_user_index];
+          const char *uri = user.playlists[s_playlist_index].uri;
+          esp_event_post(APP_EVENT, APP_EVENT_PLAYLIST_PLAY_REQUESTED,
+                         uri, strlen(uri) + 1, 0);
+        }
+      } else {
+        // Just resume current content
+        sonos_play();
+      }
       s_play_state = PlayState::Playing;
       s_user_paused = false;
       s_play_action_ms = lv_tick_get();
@@ -934,6 +955,7 @@ static void handle_encoder(int32_t steps) {
         int idx = s_playlist_index + static_cast<int>(steps);
         s_playlist_index = ((idx % count) + count) % count;
       }
+      s_browsed_while_paused = true;
       haptic_buzz();
       update_screen_content();
     } else {
@@ -1394,6 +1416,11 @@ void ui_set_station(int index) {
   if (index < 0 || index >= RADIO_STATION_COUNT)
     return;
   if (display_lock(50)) {
+    // Ignore stale station updates during play state grace period
+    if (lv_tick_elaps(s_play_action_ms) < PLAY_STATE_GRACE_MS) {
+      display_unlock();
+      return;
+    }
     s_radio_index = index;
     s_selected_mode = JukeboxMode::Radio;
     if (s_screen_state == AppScreen::NowPlaying) {
