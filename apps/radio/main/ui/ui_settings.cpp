@@ -197,7 +197,7 @@ static void select_speaker(int index) {
   // Rebuild to update green dot
   rebuild_speaker_list();
 
-  haptic_buzz();
+  haptic_play(HAPTIC_CLICK);
 }
 
 // ─── Page Lifecycle ─────────────────────────────────────────────────────────
@@ -319,7 +319,7 @@ void ui_settings_encoder(int steps) {
   s_highlight = ((idx % s_speaker_item_count) + s_speaker_item_count) %
                 s_speaker_item_count;
   highlight_item(s_highlight);
-  haptic_buzz();
+  haptic_play(HAPTIC_TICK);
 }
 
 void ui_settings_tap() {

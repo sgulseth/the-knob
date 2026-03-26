@@ -91,11 +91,13 @@ void haptic_init() {
   ESP_LOGI(TAG, "DRV2605 ready (status=0x%02x)", status);
 }
 
-void haptic_buzz() {
+void haptic_play(uint8_t effect) {
   if (!s_ready)
     return;
 
-  write_reg(REG_WAVESEQ1, EFFECT_STRONG_CLICK);
+  write_reg(REG_WAVESEQ1, effect);
   write_reg(REG_WAVESEQ2, 0x00);
   write_reg(REG_GO, 0x01);
 }
+
+void haptic_buzz() { haptic_play(EFFECT_STRONG_CLICK); }

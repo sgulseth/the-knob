@@ -99,7 +99,7 @@ static void on_timer_started(void *, esp_event_base_t, int32_t, void *data) {
 static void on_timer_fired(void *, esp_event_base_t, int32_t, void *data) {
   auto *label = static_cast<const char *>(data);
   ESP_LOGI(TAG, "Timer fired: %s", label ? label : "(none)");
-  haptic_buzz();
+  haptic_play(HAPTIC_ALERT);
 }
 
 // ─── Voice Mode Events ──────────────────────────────────────────────────────

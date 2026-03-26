@@ -762,7 +762,7 @@ static void do_tap() {
   case AppScreen::NowPlaying:
     // Toggle pause/play
     if (s_play_state == PlayState::Playing) {
-      haptic_buzz();
+      haptic_play(HAPTIC_CLICK);
       sonos_pause();
       s_play_state = PlayState::Paused;
       s_user_paused = true;
@@ -794,7 +794,7 @@ static void do_tap() {
       s_user_paused = false;
       s_play_action_ms = lv_tick_get();
     }
-    haptic_buzz();
+    haptic_play(HAPTIC_CLICK);
     update_screen_content();
     break;
   }
@@ -906,13 +906,13 @@ static void on_screen_gesture(lv_event_t *e) {
 
 static void on_prev_tap(lv_event_t *) {
   backlight_poke();
-  haptic_buzz();
+  haptic_play(HAPTIC_CLICK);
   sonos_previous();
 }
 
 static void on_next_tap(lv_event_t *) {
   backlight_poke();
-  haptic_buzz();
+  haptic_play(HAPTIC_CLICK);
   sonos_next();
 }
 
@@ -953,7 +953,7 @@ static void handle_encoder(int32_t steps) {
       int raw = s_volume + static_cast<int>(steps) * VOLUME_STEP;
       s_volume = std::clamp(raw, VOLUME_MIN, VOLUME_MAX);
       if (raw < VOLUME_MIN || raw > VOLUME_MAX)
-        haptic_buzz();
+        haptic_play(HAPTIC_BUMP);
       show_volume(s_volume);
       s_local_vol_ms = lv_tick_get();
       int32_t vol = s_volume;
@@ -965,7 +965,7 @@ static void handle_encoder(int32_t steps) {
         s_selected_mode = (s_selected_mode == JukeboxMode::Radio)
                               ? JukeboxMode::Playlist
                               : JukeboxMode::Radio;
-        haptic_buzz();
+        haptic_play(HAPTIC_MODE);
         update_screen_content();
       }
     }
@@ -976,7 +976,7 @@ static void handle_encoder(int32_t steps) {
     int idx = s_radio_index + static_cast<int>(steps);
     s_radio_index = ((idx % RADIO_STATION_COUNT) + RADIO_STATION_COUNT) %
                     RADIO_STATION_COUNT;
-    haptic_buzz();
+    haptic_play(HAPTIC_TICK);
     update_screen_content();
     lv_timer_reset(s_browse_timer);
     break;
@@ -984,7 +984,7 @@ static void handle_encoder(int32_t steps) {
 
   case AppScreen::UserSelect: {
     s_user_index = next_active_user(s_user_index, steps > 0 ? 1 : -1);
-    haptic_buzz();
+    haptic_play(HAPTIC_TICK);
     update_screen_content();
     lv_timer_reset(s_browse_timer);
     break;
@@ -994,7 +994,7 @@ static void handle_encoder(int32_t steps) {
     int count = USERS[s_user_index].playlist_count;
     int idx = s_playlist_index + static_cast<int>(steps);
     s_playlist_index = ((idx % count) + count) % count;
-    haptic_buzz();
+    haptic_play(HAPTIC_TICK);
     update_screen_content();
     lv_timer_reset(s_browse_timer);
     break;
@@ -1014,7 +1014,7 @@ static void handle_encoder(int32_t steps) {
         s_playlist_index = ((idx % count) + count) % count;
       }
       s_browsed_while_paused = true;
-      haptic_buzz();
+      haptic_play(HAPTIC_TICK);
       update_screen_content();
       show_browse_indicator();
     } else {
@@ -1022,7 +1022,7 @@ static void handle_encoder(int32_t steps) {
       int raw = s_volume + static_cast<int>(steps) * VOLUME_STEP;
       s_volume = std::clamp(raw, VOLUME_MIN, VOLUME_MAX);
       if (raw < VOLUME_MIN || raw > VOLUME_MAX)
-        haptic_buzz();
+        haptic_play(HAPTIC_BUMP);
       show_volume(s_volume);
       s_local_vol_ms = lv_tick_get();
       int32_t vol = s_volume;
