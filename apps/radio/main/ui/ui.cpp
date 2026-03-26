@@ -150,6 +150,7 @@ static void on_page_changed(int index, const char *id);
 static void on_encoder_poll(lv_timer_t *);
 static void on_prev_tap(lv_event_t *);
 static void on_next_tap(lv_event_t *);
+static void highlight_picker_item(int highlight);
 
 // ─── Animation Helpers ──────────────────────────────────────────────────────
 
