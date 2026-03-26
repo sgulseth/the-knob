@@ -24,9 +24,7 @@ static constexpr const char *TAG = "ui";
 
 // ─── Event IDs (must match main.cpp) ────────────────────────────────────────
 
-enum : int32_t {
-  APP_EVENT_PLAYLIST_PLAY_REQUESTED = 210,
-};
+// Event IDs defined in app_config.h
 
 // ─── Timing Constants ───────────────────────────────────────────────────────
 
@@ -592,7 +590,7 @@ static void transition_to(AppScreen screen) {
     if (s_volume > VOLUME_CAP_ON_SOURCE_CHANGE) {
       s_volume = VOLUME_CAP_ON_SOURCE_CHANGE;
       sonos_set_volume(s_volume);
-      settings_set_volume(s_volume);
+      // NVS write handled by debounced on_volume_changed in main.cpp
       lv_arc_set_value(s_vol_arc, s_volume);
       s_arc_display_val = s_volume;
     }
@@ -715,6 +713,7 @@ static void do_tap() {
   case AppScreen::NowPlaying:
     // Toggle pause/play
     if (s_play_state == PlayState::Playing) {
+      haptic_buzz();
       sonos_pause();
       s_play_state = PlayState::Paused;
       s_user_paused = true;
@@ -746,6 +745,7 @@ static void do_tap() {
       s_user_paused = false;
       s_play_action_ms = lv_tick_get();
     }
+    haptic_buzz();
     update_screen_content();
     break;
   }

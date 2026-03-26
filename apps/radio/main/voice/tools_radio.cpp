@@ -150,7 +150,7 @@ static bool handle_play_playlist(const char *args, ToolResult *r) {
   }
 
   const char *uri = user.playlists[pl_idx].uri;
-  esp_event_post(APP_EVENT, 210, (void *)uri, strlen(uri) + 1, 0);
+  esp_event_post(APP_EVENT, APP_EVENT_PLAYLIST_PLAY_REQUESTED, (void *)uri, strlen(uri) + 1, 0);
 
   r->success = true;
   snprintf(r->output, sizeof(r->output), "Now playing %s's playlist: %s.",

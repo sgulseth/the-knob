@@ -100,6 +100,13 @@ constexpr const char *VOICE_INSTRUCTIONS =
     "Help the user pick a mode, station, or playlist. "
     "Keep responses short and friendly.";
 
+// ─── Custom Event IDs ────────────────────────────────────────────────────────
+
+enum : int32_t {
+  APP_EVENT_PLAYLIST_PLAY_REQUESTED = 210,
+  APP_EVENT_MODE_CHANGED = 211,
+};
+
 // ─── Task Config ────────────────────────────────────────────────────────────
 
 constexpr int UI_TASK_STACK = 8192;

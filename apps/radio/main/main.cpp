@@ -29,12 +29,7 @@
 
 static constexpr const char *TAG = "main";
 
-// ─── App-level Events (after Sonos events at 200) ──────────────────────────
-
-enum : int32_t {
-  APP_EVENT_PLAYLIST_PLAY_REQUESTED = 210,
-  APP_EVENT_MODE_CHANGED = 211,
-};
+// App-level event IDs defined in app_config.h
 
 ESP_EVENT_DEFINE_BASE(APP_EVENT);
 
@@ -52,13 +47,31 @@ static void on_station_changed(void *, esp_event_base_t, int32_t, void *data) {
   // confirm_browse() posts both STATION_CHANGED and PLAY_REQUESTED.
 }
 
+static uint32_t s_vol_save_pending_ms = 0;
+static bool s_vol_save_pending = false;
+static constexpr int VOL_SAVE_DEBOUNCE_MS = 3000; // Write NVS after 3s idle
+
 static void on_volume_changed(void *, esp_event_base_t, int32_t, void *data) {
   auto vol = *static_cast<int32_t *>(data);
   s_volume = vol;
-  settings_set_volume(vol);
+  // Debounce NVS write — flash has limited write endurance
+  s_vol_save_pending = true;
+  s_vol_save_pending_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+}
+
+static void flush_pending_volume() {
+  if (s_vol_save_pending) {
+    uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    if ((now - s_vol_save_pending_ms) >= VOL_SAVE_DEBOUNCE_MS) {
+      settings_set_volume(s_volume);
+      s_vol_save_pending = false;
+      ESP_LOGI(TAG, "Volume saved to NVS: %d", s_volume);
+    }
+  }
 }
 
 static void on_sonos_state(void *, esp_event_base_t, int32_t, void *data) {
+  flush_pending_volume();
   auto *state = static_cast<SonosState *>(data);
   ui_set_play_state(state->play_state);
   if (state->volume != s_volume) {
