@@ -492,6 +492,15 @@ static void update_screen_content() {
              RADIO_STATION_COUNT);
     lv_label_set_text(s_lbl_position, pos_buf);
     lv_obj_remove_flag(s_lbl_position, LV_OBJ_FLAG_HIDDEN);
+    // Show station logo
+    if (RADIO_STATIONS[s_radio_index].logo) {
+      lv_image_set_src(s_img_logo, RADIO_STATIONS[s_radio_index].logo);
+      lv_image_set_inner_align(s_img_logo, LV_IMAGE_ALIGN_STRETCH);
+      lv_obj_remove_flag(s_logo_container, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_set_style_opa(s_logo_container, LV_OPA_COVER, LV_PART_MAIN);
+      // Move title below logo
+      lv_obj_align(s_lbl_title, LV_ALIGN_CENTER, 0, 68);
+    }
     set_bg_color(RADIO_STATIONS[s_radio_index].color, true);
     break;
   }
@@ -549,6 +558,11 @@ static void update_screen_content() {
       lv_label_set_text(s_lbl_subtitle,
                         s_play_state == PlayState::Paused ? "Paused"
                                                          : "Playing");
+      // Show station logo as fallback art for radio streams
+      if (RADIO_STATIONS[s_radio_index].logo && !s_art_pixels) {
+        lv_image_set_src(s_img_logo, RADIO_STATIONS[s_radio_index].logo);
+        lv_image_set_inner_align(s_img_logo, LV_IMAGE_ALIGN_STRETCH);
+      }
     } else {
       auto &user = USERS[s_user_index];
       lv_label_set_text(s_lbl_title,

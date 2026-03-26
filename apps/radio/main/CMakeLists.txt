@@ -9,6 +9,8 @@ set(SRCS
     "ui/ui_timer.cpp"
     "ui/ui_voice.cpp"
     "ui/ui_settings.cpp"
+    "ui/images/nrk_p2.c"
+    "ui/images/nrk_nyheter.c"
     "voice/tools_radio.cpp"
 )
 

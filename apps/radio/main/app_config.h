@@ -5,6 +5,7 @@
 #include "sonos_config.h"
 #include "voice_config.h"
 #include "timer_events.h"
+#include "ui/images/images.h"
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
@@ -27,15 +28,16 @@ struct Station {
   const char *name;
   const char *url;
   uint32_t color;
+  const lv_image_dsc_t *logo; // nullptr if no logo
 };
 
 constexpr Station RADIO_STATIONS[] = {
     {"NRK P2",
      "https://cdn0-47115-liveicecast0.dna.contentdelivery.net/p2_aac_h",
-     0x280514},
+     0x280514, &nrk_p2},
     {"NRK Alltid Nyheter",
      "https://cdn0-47115-liveicecast0.dna.contentdelivery.net/nyheter_aac_h",
-     0x051428},
+     0x051428, &nrk_nyheter},
 };
 
 constexpr int RADIO_STATION_COUNT =

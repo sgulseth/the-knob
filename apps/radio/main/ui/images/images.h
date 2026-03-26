@@ -1,6 +1,7 @@
 #pragma once
 
-// Station logo images removed — jukebox uses text-based UI.
-// This file kept as a placeholder for future image assets.
-
 #include "lvgl.h"
+
+// Station logos — RGB565A8 + LZ4 compressed, generated from assets/logos/
+LV_IMAGE_DECLARE(nrk_p2);
+LV_IMAGE_DECLARE(nrk_nyheter);
