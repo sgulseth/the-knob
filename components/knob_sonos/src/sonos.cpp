@@ -365,21 +365,63 @@ static void parse_media_info(const char *raw_metadata, const char *track_uri,
 
 // ─── Commands ───────────────────────────────────────────────────────────────
 
+// DIDL-Lite metadata template for Spotify playlists on Sonos
+static constexpr const char *SPOTIFY_PLAYLIST_META_FMT =
+    "&lt;DIDL-Lite xmlns:dc=&quot;http://purl.org/dc/elements/1.1/&quot; "
+    "xmlns:upnp=&quot;urn:schemas-upnp-org:metadata-1-0/upnp/&quot; "
+    "xmlns:r=&quot;urn:schemas-rinconnetworks-com:metadata-1-0/&quot; "
+    "xmlns=&quot;urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/&quot;&gt;"
+    "&lt;item id=&quot;1006206c%s&quot; restricted=&quot;true&quot;&gt;"
+    "&lt;upnp:class&gt;object.container.playlistContainer&lt;/upnp:class&gt;"
+    "&lt;desc id=&quot;cdudn&quot; nameSpace=&quot;urn:schemas-rinconnetworks-com:metadata-1-0/&quot;&gt;"
+    "SA_RINCON2311_X_#Svc2311-0-Token&lt;/desc&gt;"
+    "&lt;/item&gt;&lt;/DIDL-Lite&gt;";
+
+// SetAVTransportURI with metadata support
+static constexpr const char *SET_URI_META_FMT =
+    "<u:SetAVTransportURI xmlns:u=\"" AV_TRANSPORT_NS "\">"
+    "<InstanceID>0</InstanceID>"
+    "<CurrentURI>%s</CurrentURI>"
+    "<CurrentURIMetaData>%s</CurrentURIMetaData>"
+    "</u:SetAVTransportURI>";
+
 static void exec_play_uri(const char *uri) {
-  // Sonos requires x-rincon-mp3radio:// for internet radio streams
-  char fixed_uri[280]; // 256 max URI + 20 char prefix
-  if (strncmp(uri, "https://", 8) == 0) {
+  char fixed_uri[280];
+  char metadata[768] = "";
+  bool use_metadata = false;
+
+  if (strncmp(uri, "spotify:playlist:", 17) == 0) {
+    // Spotify playlist — wrap in x-rincon-cpcontainer with DIDL-Lite metadata
+    snprintf(fixed_uri, sizeof(fixed_uri),
+             "x-rincon-cpcontainer:1006206c%s?sid=9&flags=8300&sn=7", uri);
+    snprintf(metadata, sizeof(metadata), SPOTIFY_PLAYLIST_META_FMT, uri);
+    use_metadata = true;
+  } else if (strncmp(uri, "spotify:album:", 14) == 0) {
+    // Spotify album
+    snprintf(fixed_uri, sizeof(fixed_uri),
+             "x-rincon-cpcontainer:0004206c%s?sid=9&flags=8300&sn=7", uri);
+    snprintf(metadata, sizeof(metadata), SPOTIFY_PLAYLIST_META_FMT, uri);
+    use_metadata = true;
+  } else if (strncmp(uri, "https://", 8) == 0) {
+    // Internet radio (HTTPS)
     snprintf(fixed_uri, sizeof(fixed_uri), "x-rincon-mp3radio://%s", uri + 8);
   } else if (strncmp(uri, "http://", 7) == 0) {
+    // Internet radio (HTTP)
     snprintf(fixed_uri, sizeof(fixed_uri), "x-rincon-mp3radio://%s", uri + 7);
   } else {
+    // Pass through as-is
     strncpy(fixed_uri, uri, sizeof(fixed_uri) - 1);
     fixed_uri[sizeof(fixed_uri) - 1] = '\0';
   }
 
-  char inner[512];
+  // Build SOAP body — with or without metadata
+  static char inner[1536];
   ESP_LOGI(TAG, "SetAVTransportURI: input='%s' → fixed='%s'", uri, fixed_uri);
-  snprintf(inner, sizeof(inner), SET_URI_FMT, fixed_uri);
+  if (use_metadata) {
+    snprintf(inner, sizeof(inner), SET_URI_META_FMT, fixed_uri, metadata);
+  } else {
+    snprintf(inner, sizeof(inner), SET_URI_FMT, fixed_uri);
+  }
 
   // Use soap_request (not soap_fire) so we can log error responses
   static char resp_buf[512];

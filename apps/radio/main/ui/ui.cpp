@@ -153,6 +153,36 @@ static void on_prev_tap(lv_event_t *);
 static void on_next_tap(lv_event_t *);
 static void highlight_picker_item(int highlight);
 
+// ─── User Filtering (skip users with no playlists) ────────────────────────
+
+static int active_user_count() {
+  int count = 0;
+  for (int i = 0; i < USER_COUNT; i++) {
+    if (USERS[i].playlist_count > 0)
+      count++;
+  }
+  return count;
+}
+
+static int next_active_user(int current, int direction) {
+  // direction: +1 or -1
+  int idx = current;
+  for (int i = 0; i < USER_COUNT; i++) {
+    idx = ((idx + direction) % USER_COUNT + USER_COUNT) % USER_COUNT;
+    if (USERS[idx].playlist_count > 0)
+      return idx;
+  }
+  return current; // No active users found
+}
+
+static int first_active_user() {
+  for (int i = 0; i < USER_COUNT; i++) {
+    if (USERS[i].playlist_count > 0)
+      return i;
+  }
+  return -1; // No active users
+}
+
 // ─── Animation Helpers ──────────────────────────────────────────────────────
 
 static void anim_opa_cb(void *obj, int32_t v) {
@@ -460,8 +490,13 @@ static void update_screen_content() {
   case AppScreen::UserSelect: {
     lv_label_set_text(s_lbl_title, USERS[s_user_index].name);
     lv_label_set_text(s_lbl_subtitle, "Tap for playlists");
-    snprintf(pos_buf, sizeof(pos_buf), "%d / %d", s_user_index + 1,
-             USER_COUNT);
+    int au_count = active_user_count();
+    // Count position among active users
+    int au_pos = 0;
+    for (int i = 0; i <= s_user_index; i++) {
+      if (USERS[i].playlist_count > 0) au_pos++;
+    }
+    snprintf(pos_buf, sizeof(pos_buf), "%d / %d", au_pos, au_count);
     lv_label_set_text(s_lbl_position, pos_buf);
     lv_obj_remove_flag(s_lbl_position, LV_OBJ_FLAG_HIDDEN);
     set_bg_color(USERS[s_user_index].color, true);
@@ -629,10 +664,15 @@ static void do_tap() {
       show_idle_ui(false);
       break; // Dead tap — first tap only wakes, doesn't navigate
     }
-    if (s_selected_mode == JukeboxMode::Radio)
+    if (s_selected_mode == JukeboxMode::Radio) {
       transition_to(AppScreen::RadioBrowse);
-    else
-      transition_to(AppScreen::UserSelect);
+    } else {
+      int first = first_active_user();
+      if (first >= 0) {
+        s_user_index = first;
+        transition_to(AppScreen::UserSelect);
+      }
+    }
     break;
 
   case AppScreen::RadioBrowse: {
@@ -752,9 +792,18 @@ static void on_screen_released(lv_event_t *) {
   do_tap();
 }
 
+static constexpr int GESTURE_MIN_DISTANCE = 40; // Minimum px to count as swipe
+
 static void on_screen_gesture(lv_event_t *e) {
   lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
   if (dir == LV_DIR_TOP) {
+    // Check actual movement distance to avoid false triggers from taps
+    lv_point_t vect;
+    lv_indev_get_vect(lv_indev_active(), &vect);
+    int dist = (vect.y < 0) ? -vect.y : vect.y;
+    if (dist < GESTURE_MIN_DISTANCE)
+      return; // Too small — ignore, let tap handle it
+
     s_gesture_fired = true;
     lv_timer_pause(s_press_timer); // Cancel long-press detection
     backlight_poke();
@@ -821,12 +870,14 @@ static void handle_encoder(int32_t steps) {
       esp_event_post(APP_EVENT, APP_EVENT_VOLUME_CHANGED, &vol, sizeof(vol), 0);
       sonos_set_volume(s_volume);
     } else {
-      // Cycle modes
-      s_selected_mode = (s_selected_mode == JukeboxMode::Radio)
-                            ? JukeboxMode::Playlist
-                            : JukeboxMode::Radio;
-      haptic_buzz();
-      update_screen_content();
+      // Cycle modes — only show Playlist if there are active users
+      if (active_user_count() > 0) {
+        s_selected_mode = (s_selected_mode == JukeboxMode::Radio)
+                              ? JukeboxMode::Playlist
+                              : JukeboxMode::Radio;
+        haptic_buzz();
+        update_screen_content();
+      }
     }
     break;
   }
@@ -842,8 +893,7 @@ static void handle_encoder(int32_t steps) {
   }
 
   case AppScreen::UserSelect: {
-    int idx = s_user_index + static_cast<int>(steps);
-    s_user_index = ((idx % USER_COUNT) + USER_COUNT) % USER_COUNT;
+    s_user_index = next_active_user(s_user_index, steps > 0 ? 1 : -1);
     haptic_buzz();
     update_screen_content();
     lv_timer_reset(s_browse_timer);
