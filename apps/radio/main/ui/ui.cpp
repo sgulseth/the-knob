@@ -70,6 +70,7 @@ static PlayState s_play_state = PlayState::Stopped;
 static bool s_idle_active = false;
 static MediaInfo s_media = {};
 static bool s_external_playing = false;
+static bool s_user_paused = false; // True when user tapped pause — suppresses auto-exit
 static bool s_voice_active = false;
 
 // ─── Widgets ────────────────────────────────────────────────────────────────
@@ -637,6 +638,7 @@ static void go_back() {
     transition_to(AppScreen::UserSelect);
     break;
   case AppScreen::NowPlaying:
+    s_user_paused = false; // Clear on manual exit
     transition_to(AppScreen::ModeSelect);
     break;
   }
@@ -681,6 +683,7 @@ static void do_tap() {
     esp_event_post(APP_EVENT, APP_EVENT_STATION_CHANGED, &idx, sizeof(idx), 0);
     esp_event_post(APP_EVENT, APP_EVENT_PLAY_REQUESTED, nullptr, 0, 0);
     s_play_state = PlayState::Playing;
+    s_user_paused = false;
     s_external_playing = false;
     s_media = {};
     transition_to(AppScreen::NowPlaying);
@@ -699,6 +702,7 @@ static void do_tap() {
     esp_event_post(APP_EVENT, APP_EVENT_PLAYLIST_PLAY_REQUESTED,
                    uri, strlen(uri) + 1, 0);
     s_play_state = PlayState::Playing;
+    s_user_paused = false;
     s_external_playing = false;
     s_media = {};
     transition_to(AppScreen::NowPlaying);
@@ -710,9 +714,12 @@ static void do_tap() {
     if (s_play_state == PlayState::Playing) {
       sonos_pause();
       s_play_state = PlayState::Paused;
-    } else if (s_play_state == PlayState::Paused) {
+      s_user_paused = true;
+    } else if (s_play_state == PlayState::Paused ||
+               s_play_state == PlayState::Stopped) {
       sonos_play();
       s_play_state = PlayState::Playing;
+      s_user_paused = false;
     }
     update_screen_content();
     break;
@@ -1356,9 +1363,16 @@ void ui_set_play_state(PlayState state) {
     if (s_screen_state == AppScreen::NowPlaying) {
       update_screen_content();
     }
+    // Only auto-exit NowPlaying on Stopped if user didn't initiate pause.
+    // Sonos radio streams report Stopped when paused — we stay on NowPlaying
+    // so the user can tap to resume.
     if (state == PlayState::Stopped &&
-        s_screen_state == AppScreen::NowPlaying) {
+        s_screen_state == AppScreen::NowPlaying && !s_user_paused) {
       transition_to(AppScreen::ModeSelect);
+    }
+    // Clear user_paused if something starts playing again (e.g. external control)
+    if (state == PlayState::Playing) {
+      s_user_paused = false;
     }
     if (should_idle())
       show_idle_ui(true);
