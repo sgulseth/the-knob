@@ -104,18 +104,16 @@ static void on_voice_deactivate(void *, esp_event_base_t, int32_t, void *) {
 static void on_voice_state(void *, esp_event_base_t, int32_t, void *data) {
   auto state = *static_cast<VoiceState *>(data);
   if (state == VoiceState::Inactive) {
-    voice_ui_exit();
+    ui_voice_deactivate();
   } else {
-    voice_ui_set_state(state);
+    ui_voice_set_state(state);
   }
 }
 
 static void on_voice_transcript(void *, esp_event_base_t, int32_t, void *data) {
   auto *text = static_cast<const char *>(data);
-  // Determine if this is user or AI text based on current voice state
-  // (Thinking = user just spoke, Speaking = AI responding)
-  // For now, show all transcripts as AI text (non-dimmed)
-  voice_ui_set_transcript(text, false);
+  // Route through ui_ API which has display_lock protection
+  ui_voice_set_transcript(text, false);
 }
 
 static void discover_and_connect_task(void *) {

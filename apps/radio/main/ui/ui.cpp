@@ -30,7 +30,7 @@ enum : int32_t {
 
 // ─── Timing Constants ───────────────────────────────────────────────────────
 
-static constexpr int BROWSE_TIMEOUT_MS = 7000;
+static constexpr int BROWSE_TIMEOUT_MS = 12000;
 static constexpr int VOL_DISPLAY_MS = 1500;
 static constexpr int VOL_LOCAL_GRACE_MS = 2000;
 static constexpr int ENCODER_POLL_MS = 20;
@@ -112,6 +112,7 @@ static lv_timer_t *s_browse_timer;
 // Touch / press detection
 static lv_timer_t *s_press_timer;
 static bool s_press_was_long;
+static bool s_gesture_fired;
 
 // Clock
 static lv_timer_t *s_clock_timer;
@@ -417,6 +418,9 @@ static void update_screen_content() {
   // Hide logo container by default
   lv_obj_add_flag(s_logo_container, LV_OBJ_FLAG_HIDDEN);
 
+  // Hide speaker label by default (shown on ModeSelect + NowPlaying)
+  lv_obj_add_flag(s_lbl_speaker, LV_OBJ_FLAG_HIDDEN);
+
   // Reset subtitle position
   lv_obj_align(s_lbl_subtitle, LV_ALIGN_CENTER, 0, 94);
   lv_label_set_long_mode(s_lbl_subtitle, LV_LABEL_LONG_WRAP);
@@ -437,6 +441,7 @@ static void update_screen_content() {
                                 : "Playlists";
     lv_label_set_text(s_lbl_title, mode_name);
     lv_label_set_text(s_lbl_subtitle, "Tap to select");
+    lv_obj_remove_flag(s_lbl_speaker, LV_OBJ_FLAG_HIDDEN);
     set_bg_color(0x0A0A0A, true);
     break;
   }
@@ -514,6 +519,8 @@ static void update_screen_content() {
       lv_obj_remove_flag(s_btn_prev, LV_OBJ_FLAG_HIDDEN);
       lv_obj_remove_flag(s_btn_next, LV_OBJ_FLAG_HIDDEN);
     }
+
+    lv_obj_remove_flag(s_lbl_speaker, LV_OBJ_FLAG_HIDDEN);
 
     if (s_selected_mode == JukeboxMode::Radio)
       set_bg_color(RADIO_STATIONS[s_radio_index].color, true);
@@ -618,8 +625,10 @@ static void do_tap() {
 
   switch (s_screen_state) {
   case AppScreen::ModeSelect:
-    if (s_idle_active)
+    if (s_idle_active) {
       show_idle_ui(false);
+      break; // Dead tap — first tap only wakes, doesn't navigate
+    }
     if (s_selected_mode == JukeboxMode::Radio)
       transition_to(AppScreen::RadioBrowse);
     else
@@ -717,13 +726,14 @@ static void on_press_timer(lv_timer_t *) {
 
 static void on_screen_pressed(lv_event_t *) {
   s_press_was_long = false;
+  s_gesture_fired = false;
   lv_timer_reset(s_press_timer);
   lv_timer_resume(s_press_timer);
 }
 
 static void on_screen_released(lv_event_t *) {
   lv_timer_pause(s_press_timer);
-  if (s_press_was_long)
+  if (s_press_was_long || s_gesture_fired)
     return;
 
   backlight_poke();
@@ -745,6 +755,8 @@ static void on_screen_released(lv_event_t *) {
 static void on_screen_gesture(lv_event_t *e) {
   lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
   if (dir == LV_DIR_TOP) {
+    s_gesture_fired = true;
+    lv_timer_pause(s_press_timer); // Cancel long-press detection
     backlight_poke();
     pages_poke();
     if (ui_is_voice_active()) {
@@ -849,16 +861,32 @@ static void handle_encoder(int32_t steps) {
   }
 
   case AppScreen::NowPlaying: {
-    // Volume control
-    int raw = s_volume + static_cast<int>(steps) * VOLUME_STEP;
-    s_volume = std::clamp(raw, VOLUME_MIN, VOLUME_MAX);
-    if (raw < VOLUME_MIN || raw > VOLUME_MAX)
+    if (s_play_state == PlayState::Paused ||
+        s_play_state == PlayState::Stopped) {
+      // When paused/stopped, encoder browses content
+      if (s_selected_mode == JukeboxMode::Radio) {
+        int idx = s_radio_index + static_cast<int>(steps);
+        s_radio_index = ((idx % RADIO_STATION_COUNT) + RADIO_STATION_COUNT) %
+                        RADIO_STATION_COUNT;
+      } else {
+        int count = USERS[s_user_index].playlist_count;
+        int idx = s_playlist_index + static_cast<int>(steps);
+        s_playlist_index = ((idx % count) + count) % count;
+      }
       haptic_buzz();
-    show_volume(s_volume);
-    s_local_vol_ms = lv_tick_get();
-    int32_t vol = s_volume;
-    esp_event_post(APP_EVENT, APP_EVENT_VOLUME_CHANGED, &vol, sizeof(vol), 0);
-    sonos_set_volume(s_volume);
+      update_screen_content();
+    } else {
+      // When playing, encoder = volume
+      int raw = s_volume + static_cast<int>(steps) * VOLUME_STEP;
+      s_volume = std::clamp(raw, VOLUME_MIN, VOLUME_MAX);
+      if (raw < VOLUME_MIN || raw > VOLUME_MAX)
+        haptic_buzz();
+      show_volume(s_volume);
+      s_local_vol_ms = lv_tick_get();
+      int32_t vol = s_volume;
+      esp_event_post(APP_EVENT, APP_EVENT_VOLUME_CHANGED, &vol, sizeof(vol), 0);
+      sonos_set_volume(s_volume);
+    }
     break;
   }
   }
