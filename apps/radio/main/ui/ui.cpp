@@ -70,6 +70,7 @@ static PlayState s_play_state = PlayState::Stopped;
 static bool s_idle_active = false;
 static MediaInfo s_media = {};
 static bool s_external_playing = false;
+static bool s_voice_active = false;
 
 // ─── Widgets ────────────────────────────────────────────────────────────────
 
@@ -154,10 +155,6 @@ static void on_next_tap(lv_event_t *);
 
 static void anim_opa_cb(void *obj, int32_t v) {
   lv_obj_set_style_opa(static_cast<lv_obj_t *>(obj), v, LV_PART_MAIN);
-}
-
-static void anim_img_opa_cb(void *obj, int32_t v) {
-  lv_obj_set_style_image_opa(static_cast<lv_obj_t *>(obj), v, LV_PART_MAIN);
 }
 
 static void anim_arc_ind_opa_cb(void *obj, int32_t v) {
@@ -409,24 +406,6 @@ static void show_idle_ui(bool idle) {
 }
 
 // ─── Screen Content Updates ─────────────────────────────────────────────────
-
-static uint32_t current_bg_color() {
-  switch (s_screen_state) {
-  case AppScreen::ModeSelect:
-    return 0x0A0A0A;
-  case AppScreen::RadioBrowse:
-    return RADIO_STATIONS[s_radio_index].color;
-  case AppScreen::UserSelect:
-    return USERS[s_user_index].color;
-  case AppScreen::PlaylistSelect:
-    return USERS[s_user_index].color;
-  case AppScreen::NowPlaying:
-    if (s_selected_mode == JukeboxMode::Radio)
-      return RADIO_STATIONS[s_radio_index].color;
-    return USERS[s_user_index].color;
-  }
-  return 0x0A0A0A;
-}
 
 static void update_screen_content() {
   // Hide position by default
@@ -799,7 +778,7 @@ static void handle_encoder(int32_t steps) {
       s_speaker_highlight =
           std::clamp(s_speaker_highlight + static_cast<int>(steps), 0,
                      s_discovered.count - 1);
-      // highlight_picker_item handled below
+      highlight_picker_item(s_speaker_highlight);
     }
     return;
   }
@@ -1137,7 +1116,7 @@ static void rebuild_speaker_list() {
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_bg_color(
         btn, COL_ACCENT,
-        static_cast<lv_style_selector_t>(LV_PART_MAIN | LV_STATE_PRESSED));
+        static_cast<lv_style_selector_t>(static_cast<int>(LV_PART_MAIN) | static_cast<int>(LV_STATE_PRESSED)));
 
     lv_obj_t *lbl = lv_label_create(btn);
     lv_obj_set_style_text_color(lbl, COL_TEXT, LV_PART_MAIN);
@@ -1165,7 +1144,7 @@ static void rebuild_speaker_list() {
   lv_obj_add_flag(skip_btn, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_set_style_bg_color(
       skip_btn, COL_ACCENT,
-      static_cast<lv_style_selector_t>(LV_PART_MAIN | LV_STATE_PRESSED));
+      static_cast<lv_style_selector_t>(static_cast<int>(LV_PART_MAIN) | static_cast<int>(LV_STATE_PRESSED)));
 
   lv_obj_t *skip_lbl = lv_label_create(skip_btn);
   lv_obj_set_style_text_color(skip_lbl, COL_TEXT_SEC, LV_PART_MAIN);
@@ -1431,9 +1410,6 @@ void ui_voice_set_transcript(const char *text, bool is_user) {
   voice_ui_set_transcript(text, is_user);
   display_unlock();
 }
-
-// Voice active state — tracked via enter/exit calls
-static bool s_voice_active = false;
 
 bool ui_is_voice_active() { return s_voice_active; }
 
