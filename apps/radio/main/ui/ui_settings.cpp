@@ -167,7 +167,7 @@ static void start_scan() {
   s_scanning = true;
   if (s_registered)
     rebuild_speaker_list();
-  xTaskCreatePinnedToCore(scan_task, "scan", 4096, nullptr, 3, nullptr, 1);
+  xTaskCreatePinnedToCore(scan_task, "scan", 6144, nullptr, 3, nullptr, 1);
 }
 
 // ─── Select Speaker ─────────────────────────────────────────────────────────
@@ -233,8 +233,8 @@ static void page_build(lv_obj_t *parent) {
 
   // Speaker list container (scrollable)
   s_list_container = lv_obj_create(parent);
-  lv_obj_set_size(s_list_container, 240, 140);
-  lv_obj_align(s_list_container, LV_ALIGN_CENTER, 0, 30);
+  lv_obj_set_size(s_list_container, 240, 120);
+  lv_obj_align(s_list_container, LV_ALIGN_CENTER, 0, 20);
   lv_obj_set_style_bg_opa(s_list_container, LV_OPA_TRANSP, LV_PART_MAIN);
   lv_obj_set_style_border_width(s_list_container, 0, LV_PART_MAIN);
   lv_obj_set_style_pad_all(s_list_container, 0, LV_PART_MAIN);
@@ -270,8 +270,19 @@ static void page_destroy() {
   s_speaker_item_count = 0;
 }
 
+static uint32_t s_scan_anim_ms = 0;
+static int s_scan_dots = 0;
+
 static void page_tick() {
-  // Nothing needed — scan results arrive via display_lock in scan_task
+  if (s_scanning && s_lbl_status) {
+    uint32_t now = lv_tick_get();
+    if (now - s_scan_anim_ms > 500) {
+      s_scan_anim_ms = now;
+      s_scan_dots = (s_scan_dots + 1) % 4;
+      const char *texts[] = {"Scanning", "Scanning.", "Scanning..", "Scanning..."};
+      lv_label_set_text(s_lbl_status, texts[s_scan_dots]);
+    }
+  }
 }
 
 static const PageDef s_settings_def = {
