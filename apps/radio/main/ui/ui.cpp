@@ -119,6 +119,7 @@ static constexpr int BROWSE_INDICATOR_MS = 2000;
 static lv_timer_t *s_press_timer;
 static bool s_press_was_long;
 static bool s_gesture_fired;
+static lv_point_t s_press_point; // Touch-down position for gesture distance calc
 
 // Clock
 static lv_timer_t *s_clock_timer;
@@ -832,6 +833,7 @@ static void on_press_timer(lv_timer_t *) {
 static void on_screen_pressed(lv_event_t *) {
   s_press_was_long = false;
   s_gesture_fired = false;
+  lv_indev_get_point(lv_indev_active(), &s_press_point);
   lv_timer_reset(s_press_timer);
   lv_timer_resume(s_press_timer);
 }
@@ -857,23 +859,23 @@ static void on_screen_released(lv_event_t *) {
   do_tap();
 }
 
-static constexpr int GESTURE_MIN_DISTANCE = 40; // Minimum px to count as swipe
+static constexpr int GESTURE_MIN_DISTANCE = 30; // Minimum px total movement for swipe
 
 static void on_screen_gesture(lv_event_t *e) {
   lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
   if (dir == LV_DIR_TOP) {
-    // Check actual movement distance to avoid false triggers from taps
-    lv_point_t vect;
-    lv_indev_get_vect(lv_indev_active(), &vect);
-    int dist = (vect.y < 0) ? -vect.y : vect.y;
-    if (dist < GESTURE_MIN_DISTANCE)
+    // Check total distance from press point (not instantaneous delta)
+    lv_point_t cur;
+    lv_indev_get_point(lv_indev_active(), &cur);
+    int dy = s_press_point.y - cur.y; // Positive = swiped up
+    if (dy < GESTURE_MIN_DISTANCE)
       return; // Too small — ignore, let tap handle it
 
     s_gesture_fired = true;
     lv_timer_pause(s_press_timer); // Cancel long-press detection
     backlight_poke();
     pages_poke();
-    if (ui_is_voice_active()) {
+    if (s_voice_active) {
       deactivate_voice();
     } else {
       go_back();
